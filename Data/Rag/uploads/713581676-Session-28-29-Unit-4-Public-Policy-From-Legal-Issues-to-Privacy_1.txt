@@ -1,0 +1,165 @@
+ Public Policy :
+From legal issues
+   to privacy
+Legal issues of internet commerce
+
+ 1. Trademarks and Domain Names
+ 2. Copyright and the Internet
+ 3. Jurisdiction Issues
+ 4. Service Provider Liability
+ 5. Formation of an Enforceable Online Contract
+Privacy - Meaning
+
+privacy is the right to be let alone, or freedom
+from interference or intrusion. Information
+privacy is the right to have some control over
+how your personal information is collected
+and used.
+ Privacy - E commerce
+The definition of online privacy is the level of privacy protection
+an individual has while connected to the Internet. It covers the
+amount of online security available for personal and financial
+data, communications, and preferences. Internet users often
+attempt to increase online privacy through anti-virus software,
+strong password choices, turning off tracking, reviewing site
+security, and opting for stricter privacy settings. Risks to online
+privacy range from phishing scams to malware, while problems
+with website security may result in identity theft.
+Privacy threats to E commerce
+ 1. Financial Frauds
+ 2. Phishing
+ 3. Spamming
+ 4. Distributed Denial of Service Attack
+ 5. Malware
+ 6. Exploitation of Known Vulnerabilities - SQL injection
+ 7. Bots
+ 8. Brute Force
+ 9. Man in the middle
+10. E skimming
+Protecting Privacy in E commerce
+ 1. Maintain An Inventory Of Service Components And Test Regularly
+ 2. Transition To A Mesh Architecture
+ 3. Employ Automated Testing Solutions
+ 4. Explore Encryption-In-Use Solutions
+ 5. Eliminate Passwords
+ 6. Apply Cybersecurity Best Practices To Data Storage
+ 7. Ensure You Meet Required Privacy Standards For Mobile Apps
+ 8. Educate Remote Employees On Security Risks
+ 9. Leverage Behavioral Analytics To Pinpoint Suspicious Behavior
+10. Enforce The Least-Privileged Principle
+Intellectual Property - Meaning
+
+Intellectual property (IP) refers to creations of the
+mind, such as inventions; literary and artistic
+works; designs; and symbols, names and images
+used in commerce.
+Protecting Intellectual Property
+1. Don't File Patents
+2. Run Lean And Fast
+3. Separate Teams
+4. Open-Source It
+5. Avoid Joint Ownership
+6. Get Exact-Match Domains
+7. Safeguard With Strong Access Control
+8. Get Strong Non-Disclosure Agreements
+9. Publish It Widely With Attribution
+Free Speech
+Freedom of speech is a principle that supports
+the freedom of an individual or a community to
+articulate their opinions and ideas without fear of
+retaliation, censorship, or legal sanction by the
+government. The right to freedom of expression
+has been recognised as a human right in the
+Universal Declaration of Human Rights and
+international human rights law by the United
+Internet indecency and censorship
+Internet censorship puts restrictions on what
+information can be publicized or viewed on the
+Internet. Governments and other organizations
+commonly use internet censorship to block
+access to copyrighted information as well as to
+harmful or sensitive content.
+Taxation Policy - India
+Under Income Tax Act
+
+ 1. Section 194-O (introduced by Finance Act,2020)
+
+E-Commerce operators should deduct TDS @1% on the gross amount of such
+sales or services or both at the time of credit of the amount of sale of goods,
+services, or both to the account of an e-commerce participant or at the time of
+making payment to an e-Commerce participant by any other mode, whichever is
+earlier.
+
+Suppose there is sales of Rs 30 lacs and returns of Rs 5 lacs, TDS should be
+deducted @ 1% on Rs 30 lacs and not on Rs 25 lacs.
+Taxation Policy - India
+Under Income Tax Act
+
+2. Section 165- Equalization Levy (introduced by Finance Act,2016)
+
+It gets triggered when-
+i. A resident person carrying on business/profession in India or
+ii. Non-Resident having a permanent establishment in India makes payment for online/digital advertising to
+a Non-Resident not having a permanent establishment in India.
+
+Limit- Consideration should exceed Rs 1 lacs per year
+
+Liability to deduct/pay equalization levy- Person paying for Online/Digital Advertising
+
+Rate- 6% of the consideration for online advertising
+
+Exclusions- Advertisement for personal purposes
+Taxation Policy - India
+Under Income Tax Act
+
+2. Section 165A- Equalization Levy (introduced by Finance Act,2020)
+
+It gets triggered when consideration is received by the E-Commerce Operator from e-commerce supply or
+services provided by it to-
+
+i. A person resident in India
+ii. A Non-Resident in the specified circumstances
+iii. A person who buys goods or services or both using Internet Protocol Address located in India
+Taxation Policy - India
+Under GST Act
+
+1. Section 52 of CGST Act,2017- Every electronic commerce operator shall collect an amount
+calculated at such rate not exceeding one per cent, as may be notified by the Government on the
+recommendations of the Council, of the net value of taxable supplies made through it by other
+suppliers where the consideration with respect to such supplies is to be collected by the operator. As
+per the Explanation, “net value of taxable supplies” shall mean that the taxable supplies returned to
+the suppliers shall be reduced from the gross value of taxable supplies.
+
+Limit – No such limit specified
+
+Liability to collect tax – E-Commerce Operator
+
+Rate- 0.5% of Net Value of Taxable Supplies as CGST and SGST each (Intra-State Sale) 1% of Net Value
+of Taxable Supplies as IGST (Inter-State Sale)
+Taxation Policy - India
+Payment of TCS with Department- Within 10 days after the end of the month in which TCS was
+collected
+
+Filing of Monthly Statement- Within 10 days after the end of the month in which TCS was collected
+
+Filing of Annual Statement- On or before 31st Day of December following the end of such FY
+
+Credit Claimed- Supplier will claim credit of TCS in his Electronic Cash Ledger
+
+Matching of Outward Supplies- Outward supplies shown by the Suppliers in their returns will be
+matched with outward supplies shown by the E-Commerce Operators
+Taxation Policy - India
+Under GST Act
+
+2. Section 9(5) of CGST Act,2017-
+i. Passenger Transport Service by Cab or Motorcycle – 100% tax payable by ECO,
+irrespective of the fact whether cab operator is registered or not
+
+ii. Accommodation for lodging or residential purposes in hotels, inns, etc. – i. Hotels, etc.
+are liable to register- ECO is not liable to pay tax
+
+iii. Hotels, etc. are not registered- ECO is liable to pay tax iii. Housekeeping, Plumbing,
+Carpeting- i. Plumbers, etc. are liable to register- ECO is not liable to pay tax ii. Plumbers,
+etc. are not registered- ECO is liable to pay tax
+Thank You
+

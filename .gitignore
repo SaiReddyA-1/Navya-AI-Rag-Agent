@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+
+# Chat history (generated at runtime)
+Data/chat_history/
+
+# DB cache
+data_cache/
+
+# Models cache
+models/
+.cache/
+
+# Pipeline output
+pipeline_output*.txt

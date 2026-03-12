@@ -1,0 +1,83 @@
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#228be6', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1971c2', 'lineColor': '#495057', 'secondaryColor': '#f1f3f5', 'tertiaryColor': '#e9ecef'}}}%%
+
+graph TB
+    subgraph OFFLINE["OFFLINE PIPELINE — Runs on Startup"]
+        direction TB
+
+        A["📂 Repository Scanner<br/><i>services/ingestion/connectors.py</i><br/>Recursive scan · SHA-256 dedup<br/>Supported: PDF, DOCX, CSV, XLSX, TXT,<br/>JSON, XML, JPG, PNG, TIFF"]
+
+        B["📄 Document Parser<br/><i>services/processing/parser.py</i><br/>PyMuPDF per-page text · python-docx<br/>pandas · UTF-8/Latin-1 fallback"]
+
+        C["🔍 OCR Engine<br/><i>services/processing/ocr.py</i><br/>Tesseract + Pillow<br/>Conditional: only if text &lt; 50 chars<br/>Handles images + scanned PDFs"]
+
+        D["🏷️ Triage AI<br/><i>services/processing/triage.py</i><br/>4-Tier Classification:<br/>1. Folder path → 95% conf<br/>2. Filename keywords → 85-92%<br/>3. Text content regex → 75-88%<br/>4. LLM auto-discovery → 80%<br/>+ Quality scoring + Issue detection"]
+
+        E["✂️ Chunking Engine<br/><i>services/embedding/chunker.py</i><br/>Page-aware recursive splitting<br/>1500 chars · 150 overlap<br/>Full metadata inheritance"]
+
+        F["🧬 Embedding Generator<br/><i>services/embedding/generator.py</i><br/>BAAI/bge-large-en-v1.5<br/>1024 dimensions · Batch=32<br/>Normalized embeddings"]
+
+        G[("🗄️ OpenSearch 2.11<br/>HNSW Vector Index<br/>cosine similarity<br/>ef=128 · m=16<br/>18 metadata fields")]
+
+        A --> B --> C --> D --> E --> F --> G
+    end
+
+    subgraph ONLINE["ONLINE PIPELINE — Per Query"]
+        direction TB
+
+        Q["💬 User Query<br/><i>ui/app.py</i><br/>Natural language input<br/>+ Conversation history"]
+
+        R["🎯 Intent Parser<br/><i>services/search/retriever.py</i><br/>Extract metadata filters<br/>from query keywords<br/>Types · Departments"]
+
+        S["🔎 Hybrid Search<br/><i>services/search/database.py</i><br/>Vector kNN + Term filters<br/>Top 15 candidates"]
+
+        T["⚖️ CrossEncoder Reranker<br/><i>services/rag/reranker.py</i><br/>ms-marco-MiniLM-L-6-v2<br/>Query-chunk pair scoring<br/>Top 5 best matches"]
+
+        U["🧠 RAG Engine<br/><i>services/rag/engine.py</i><br/>3-Layer Unified Context:<br/>① Full Document (if file mentioned)<br/>② Repository Analytics (metadata)<br/>③ Retrieved Chunks (semantic)<br/>+ Conversation memory (last 4 exchanges)"]
+
+        V["☁️ Groq API<br/>Llama 3.3 70B Versatile<br/>temperature=0.1<br/>Strict citation enforcement"]
+
+        W["📋 Answer + Citations<br/>Source files · Confidence score<br/>Query type badge<br/>Persistent chat history"]
+
+        Q --> R --> S --> T --> U --> V --> W
+    end
+
+    G -. "Vector Search" .-> S
+
+    subgraph DATA["DATA LAYER"]
+        direction LR
+        D1["📁 Data/Rag/<br/>Document Repository<br/>PDF · DOCX · CSV · XLSX<br/>TXT · JSON · XML<br/>JPG · PNG · TIFF"]
+        D2["💾 Data/chat_history/<br/>Persistent Conversations<br/>JSON storage<br/>Last 50 conversations"]
+        D3["📊 Analytics Engine<br/><i>services/analytics/intelligence.py</i><br/>Repository summary<br/>Department/Type counts<br/>Quality distribution<br/>Degradation report"]
+    end
+
+    A -. "Scans" .-> D1
+    W -. "Saves" .-> D2
+    G -. "Metadata queries" .-> D3
+
+    subgraph UI["STREAMLIT DASHBOARD — 4 Pages"]
+        direction LR
+        P1["🤖 AI Chat<br/>Query + History<br/>Sources + Confidence"]
+        P2["📁 Data Manager<br/>View · Upload · Delete<br/>Multi-file support"]
+        P3["⚙️ Pipeline Monitor<br/>7-Stage visualization<br/>DB stats · Config"]
+        P4["📊 Intelligence<br/>Health · Quality<br/>Risk alerts"]
+    end
+
+    W --> P1
+    D3 --> P3
+    D3 --> P4
+    G -. "CRUD" .-> P2
+
+    subgraph INFRA["INFRASTRUCTURE"]
+        direction LR
+        I1["🐳 Docker Compose<br/>2 containers"]
+        I2["OpenSearch 2.11<br/>512MB JVM heap<br/>Persistent volume"]
+        I3["Python 3.11-slim<br/>Tesseract OCR<br/>Pre-cached ML models"]
+    end
+
+    style OFFLINE fill:#e7f5ff,stroke:#228be6,stroke-width:2px
+    style ONLINE fill:#f3f0ff,stroke:#7950f2,stroke-width:2px
+    style DATA fill:#fff9db,stroke:#e67700,stroke-width:2px
+    style UI fill:#d3f9d8,stroke:#2b8a3e,stroke-width:2px
+    style INFRA fill:#f8f9fa,stroke:#495057,stroke-width:2px
+    style G fill:#228be6,stroke:#1971c2,color:#fff
+    style V fill:#7950f2,stroke:#6741d9,color:#fff

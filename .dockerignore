@@ -1,0 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+.git/
+.DS_Store
+logs/
+data_cache/
+pipeline_output*.txt
+*.egg-info/
