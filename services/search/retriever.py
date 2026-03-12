@@ -61,6 +61,24 @@ class QueryRetriever:
                 filters["department_category"] = dept
                 cleaned_query = cleaned_query.replace(dept, "")
 
+        # Detect folder/path references: "in the invoices folder", "from uploads"
+        folder_match = re.search(
+            r'\b(?:in|from|under)\s+(?:the\s+)?(\w+)\s+(?:folder|directory)\b',
+            cleaned_query, re.IGNORECASE,
+        )
+        if folder_match:
+            filters["folder_path"] = folder_match.group(1).lower()
+            cleaned_query = re.sub(folder_match.group(0), '', cleaned_query, flags=re.IGNORECASE)
+
+        # Detect file extension filters: "pdf files", "csv files"
+        ext_match = re.search(
+            r'\b(pdf|docx|csv|txt|xlsx|xls|json|xml|jpg|jpeg|png|tiff)\s+files?\b',
+            cleaned_query, re.IGNORECASE,
+        )
+        if ext_match:
+            filters["file_extension"] = f".{ext_match.group(1).lower()}"
+            cleaned_query = re.sub(ext_match.group(0), '', cleaned_query, flags=re.IGNORECASE)
+
         cleaned_query = re.sub(r'\s+', ' ', cleaned_query).strip()
 
         if len(cleaned_query) < 3:

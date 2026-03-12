@@ -411,6 +411,75 @@ class HybridSearchClient:
         chunks.sort(key=lambda x: x.get("chunk_index", 0))
         return chunks
 
+    def find_documents_by_metadata(
+        self, filters: Dict[str, Any], max_results: int = 50
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for documents by arbitrary metadata fields.
+        Supports wildcard matching for file_path and folder_path.
+        Returns unique documents (deduplicated by document_id).
+        """
+        if self.mode == "opensearch":
+            return self._os_find_by_metadata(filters, max_results)
+        return self._mem_find_by_metadata(filters, max_results)
+
+    def _os_find_by_metadata(self, filters: Dict[str, Any], max_results: int) -> List[Dict[str, Any]]:
+        try:
+            must_clauses = []
+            wildcard_fields = {"file_path", "folder_path", "file_name"}
+            for key, val in filters.items():
+                if key in wildcard_fields and "*" not in str(val):
+                    must_clauses.append({"wildcard": {key: f"*{val}*"}})
+                elif key in wildcard_fields:
+                    must_clauses.append({"wildcard": {key: val}})
+                else:
+                    must_clauses.append({"term": {key: val}})
+
+            body = {
+                "query": {"bool": {"must": must_clauses}},
+                "size": max_results * 3,  # over-fetch to deduplicate
+            }
+            resp = self.os_client.search(index=self.index_name, body=body)
+            seen_ids = set()
+            results = []
+            for hit in resp["hits"]["hits"]:
+                src = hit["_source"]
+                doc_id = src.get("document_id")
+                if doc_id in seen_ids:
+                    continue
+                seen_ids.add(doc_id)
+                results.append({k: v for k, v in src.items() if k != "embedding"})
+                if len(results) >= max_results:
+                    break
+            return results
+        except Exception as e:
+            logger.error(f"find_documents_by_metadata failed: {e}")
+            return []
+
+    def _mem_find_by_metadata(self, filters: Dict[str, Any], max_results: int) -> List[Dict[str, Any]]:
+        seen_ids = set()
+        results = []
+        wildcard_fields = {"file_path", "folder_path", "file_name"}
+        for payload in self._db_payloads.values():
+            match = True
+            for key, val in filters.items():
+                pval = str(payload.get(key, ""))
+                if key in wildcard_fields:
+                    if str(val).replace("*", "") not in pval:
+                        match = False
+                        break
+                elif payload.get(key) != val:
+                    match = False
+                    break
+            if match:
+                doc_id = payload.get("document_id")
+                if doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    results.append(payload.copy())
+                    if len(results) >= max_results:
+                        break
+        return results
+
     def find_document_by_filename(self, file_name: str) -> Optional[str]:
         """Find document_id by file name (for follow-up queries)."""
         if self.mode == "opensearch":

@@ -18,6 +18,7 @@ from services.rag.reranker import CrossEncoderReranker
 from services.rag.engine import RAGEngine
 from services.analytics.intelligence import RepositoryIntelligenceEngine
 from services.chat.history import ChatHistoryManager
+from services.ingestion.connectors import FileManifest
 from core.config import settings
 from core.logger import setup_enterprise_logger
 
@@ -120,7 +121,8 @@ def load_backend():
     analytics = RepositoryIntelligenceEngine(db)
     rag_engine = RAGEngine(retriever, reranker, analytics_engine=analytics)
     chat_mgr = ChatHistoryManager()
-    return db, embed_model, retriever, reranker, rag_engine, analytics, chat_mgr
+    manifest = FileManifest()
+    return db, embed_model, retriever, reranker, rag_engine, analytics, chat_mgr, manifest
 
 
 def get_backend():
@@ -134,7 +136,7 @@ def page_chat():
     st.header("AI Chat & Retrieval")
     st.caption("Ask questions against your enterprise document repository. Answers are grounded with citations.")
 
-    _, _, _, _, rag_engine, _, chat_mgr = get_backend()
+    _, _, _, _, rag_engine, _, chat_mgr, _ = get_backend()
 
     # ── Initialize session state ──────────────────────────────────────
     if "messages" not in st.session_state:
@@ -265,7 +267,7 @@ def page_data_manager():
     st.header("Data Manager")
     st.caption("View, search, and manage documents in the RAG knowledge base.")
 
-    db, embed_model, _, _, _, analytics, _ = get_backend()
+    db, embed_model, _, _, _, analytics, _, manifest = get_backend()
 
     # ── Summary Bar ───────────────────────────────────────────────────
     docs = analytics.get_document_list()
@@ -353,6 +355,12 @@ def page_data_manager():
                 result = db.delete_document(doc_id)
                 if result["status"] == "success":
                     total_deleted += result["deleted_chunks"]
+                    # Remove from manifest
+                    for rel_path, entry in manifest.get_files_dict().items():
+                        if entry.get("document_id") == doc_id:
+                            manifest.remove_entry(rel_path)
+                            break
+            manifest.save()
             st.success(f"Deleted {total_deleted} chunks from {len(selected_docs)} documents.")
             st.cache_resource.clear()
             st.rerun()
@@ -375,16 +383,17 @@ def page_data_manager():
                 (i) / len(uploaded_files),
                 text=f"Processing {uploaded.name} ({i+1}/{len(uploaded_files)})..."
             )
-            _ingest_uploaded_file(uploaded, db, embed_model)
+            _ingest_uploaded_file(uploaded, db, embed_model, manifest)
         progress.progress(1.0, text="All documents ingested!")
         st.success(f"Successfully ingested {len(uploaded_files)} document(s).")
         st.cache_resource.clear()
         st.rerun()
 
 
-def _ingest_uploaded_file(uploaded_file, db, embed_model):
+def _ingest_uploaded_file(uploaded_file, db, embed_model, manifest):
     """Run the full offline pipeline on an uploaded file.
     Saves the file to Data/Rag/uploads/ so it persists across restarts.
+    Updates the file manifest after successful processing.
     """
     import hashlib
     from services.processing.parser import DocumentParser
@@ -411,6 +420,7 @@ def _ingest_uploaded_file(uploaded_file, db, embed_model):
     save_path.write_bytes(file_bytes)
 
     doc_id = hashlib.sha256(file_bytes).hexdigest()
+    relative_path = f"uploads/{save_path.name}"
 
     payload = {
         "document_id": doc_id,
@@ -433,6 +443,28 @@ def _ingest_uploaded_file(uploaded_file, db, embed_model):
         embedded = embedder.process_chunks(chunks)
         db.upload_chunks(embedded)
 
+        # Update manifest
+        manifest.update_entry(relative_path, {
+            "document_id": doc_id,
+            "file_path": str(save_path),
+            "relative_path": relative_path,
+            "parent_folder": "uploads",
+            "file_name": uploaded_file.name,
+            "file_extension": Path(uploaded_file.name).suffix.lower(),
+            "file_size_bytes": len(file_bytes),
+            "content_hash": doc_id,
+            "modified_time": datetime.utcnow().isoformat() + "Z",
+            "status": "processed",
+            "document_type": triaged.get("document_type", "unknown"),
+            "department_category": triaged.get("department_category", "general"),
+            "quality_score": triaged.get("quality_score", 0.0),
+            "triage_confidence": triaged.get("triage_confidence", 0.0),
+            "chunk_count": len(chunks),
+            "last_processed": datetime.utcnow().isoformat() + "Z",
+            "error_message": None,
+        })
+        manifest.save()
+
 
 # ══════════════════════════════════════════════════════════════════════════
 #  PAGE 3: Pipeline Monitor
@@ -441,7 +473,7 @@ def page_pipeline_monitor():
     st.header("Pipeline Monitor")
     st.caption("End-to-end pipeline state, database health, and processing statistics.")
 
-    _, _, _, _, _, analytics, _ = get_backend()
+    _, _, _, _, _, analytics, _, _ = get_backend()
     db = get_backend()[0]
 
     state = analytics.get_pipeline_state()
@@ -564,7 +596,7 @@ def page_intelligence():
     st.header("Repository Intelligence Dashboard")
     st.caption("Enterprise analytics on document quality, compliance, and risk.")
 
-    _, _, _, _, _, analytics, _ = get_backend()
+    _, _, _, _, _, analytics, _, _ = get_backend()
 
     # ── Hero Metrics ──────────────────────────────────────────────────
     summary = analytics.get_repository_summary()

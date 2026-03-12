@@ -1,16 +1,23 @@
 """
 Startup Ingestion Script — Runs the full offline pipeline on startup.
 Pipeline: Scan → Parse → OCR → Triage → Chunk → Embed → Upload to OpenSearch
+
+Uses FileManifest for incremental processing:
+- NEW files → full pipeline
+- MODIFIED files → delete old chunks, re-process
+- DELETED files → remove chunks from OpenSearch
+- UNCHANGED files → skip entirely
 """
 import sys
 import time
 from pathlib import Path
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import settings
 from core.logger import setup_enterprise_logger
-from services.ingestion.connectors import LocalSystemConnector
+from services.ingestion.connectors import LocalSystemConnector, FileManifest
 from services.processing.parser import DocumentParser
 from services.processing.ocr import OCRService
 from services.processing.triage import TriageService
@@ -42,42 +49,73 @@ def run_ingestion():
     db = HybridSearchClient()
     logger.info(f"Database mode: {db.mode}")
 
-    # Get already-indexed file hashes to skip duplicates
+    # Load or create file manifest
+    manifest = FileManifest()
+    manifest_is_new = len(manifest.get_files_dict()) == 0
+
+    # First-run migration: if OpenSearch has data but manifest is empty,
+    # rebuild manifest from existing payloads to avoid re-processing
     existing_count = db.get_total_count()
-    logger.info(f"Database contains {existing_count} existing chunks.")
+    if manifest_is_new and existing_count > 0:
+        logger.info(f"Manifest is empty but DB has {existing_count} chunks. Migrating...")
+        all_payloads = db.get_all_payloads()
+        manifest.build_from_opensearch(all_payloads)
+        manifest.save()
+        logger.info("Manifest migration complete.")
 
-    existing_hashes = set()
-    if existing_count > 0:
-        try:
-            all_docs = db.get_all_payloads()
-            for doc in all_docs:
-                h = doc.get("document_id")
-                if h:
-                    existing_hashes.add(h)
-        except Exception:
-            pass
-    logger.info(f"Found {len(existing_hashes)} unique file hashes already indexed.")
+    # Scan filesystem
+    scanned = list(connector.scan_repository())
+    logger.info(f"Scanned {len(scanned)} files from filesystem.")
 
-    # Run pipeline
-    total_docs = 0
+    # Compute diff against manifest
+    diff = manifest.compute_diff(scanned)
+    logger.info(
+        f"Diff: {len(diff['new'])} new, {len(diff['modified'])} modified, "
+        f"{len(diff['deleted'])} deleted, {len(diff['unchanged'])} unchanged"
+    )
+
+    # Counters
+    added_docs = 0
+    updated_docs = 0
+    removed_docs = 0
     total_chunks = 0
     failed_docs = 0
-    skipped_docs = 0
 
-    for payload in connector.scan_repository():
-        # Skip files already indexed (by SHA-256 hash)
-        file_hash = payload.get("document_id")
-        if file_hash and file_hash in existing_hashes:
-            skipped_docs += 1
-            continue
+    # ── Handle DELETED files ──────────────────────────────────────────
+    for entry in diff["deleted"]:
+        old_doc_id = entry.get("document_id")
+        rel_path = entry.get("relative_path", entry.get("file_name", ""))
+        if old_doc_id:
+            result = db.delete_document(old_doc_id)
+            deleted_count = result.get("deleted_chunks", 0)
+            logger.info(f"REMOVED: {entry.get('file_name', rel_path)} ({deleted_count} chunks)")
+        manifest.remove_entry(rel_path)
+        removed_docs += 1
 
-        total_docs += 1
+    # ── Handle MODIFIED files (delete old, then re-process) ───────────
+    to_process = []
+    for payload in diff["modified"]:
+        rel_path = payload.get("relative_path", payload["file_name"])
+        old_doc_id = manifest.get_document_id(rel_path)
+        if old_doc_id:
+            db.delete_document(old_doc_id)
+            logger.info(f"UPDATING: {payload['file_name']} (deleted old chunks)")
+        to_process.append(payload)
+        updated_docs += 1
+
+    # ── Handle NEW files ──────────────────────────────────────────────
+    to_process.extend(diff["new"])
+
+    # ── Process all new + modified files through the pipeline ─────────
+    for payload in to_process:
         file_name = payload["file_name"]
+        rel_path = payload.get("relative_path", file_name)
 
         try:
             parsed = parser.parse_document(payload)
             if parsed.get("status") == "failed":
                 logger.warning(f"SKIP (parse failed): {file_name}")
+                manifest.mark_failed(rel_path, "parse_failed")
                 failed_docs += 1
                 continue
 
@@ -87,6 +125,7 @@ def run_ingestion():
 
             if not chunks:
                 logger.warning(f"SKIP (no chunks): {file_name}")
+                manifest.mark_failed(rel_path, "no_chunks")
                 failed_docs += 1
                 continue
 
@@ -94,18 +133,49 @@ def run_ingestion():
             result = db.upload_chunks(embedded)
             total_chunks += result["inserted"]
 
-            if total_docs % 25 == 0:
-                logger.info(f"Progress: {total_docs} docs, {total_chunks} chunks indexed")
+            if payload not in diff["modified"]:
+                added_docs += 1
+
+            # Update manifest with full metadata
+            manifest.update_entry(rel_path, {
+                "document_id": payload["document_id"],
+                "file_path": payload["file_path"],
+                "relative_path": rel_path,
+                "parent_folder": payload.get("parent_folder", ""),
+                "file_name": file_name,
+                "file_extension": payload["file_extension"],
+                "file_size_bytes": payload["file_size_bytes"],
+                "content_hash": payload["document_id"],
+                "modified_time": payload["modified_time"],
+                "status": "processed",
+                "document_type": triaged.get("document_type", "unknown"),
+                "department_category": triaged.get("department_category", "general"),
+                "quality_score": triaged.get("quality_score", 0.0),
+                "triage_confidence": triaged.get("triage_confidence", 0.0),
+                "chunk_count": len(chunks),
+                "last_processed": datetime.utcnow().isoformat() + "Z",
+                "error_message": None,
+            })
+
+            processed = added_docs + updated_docs
+            if processed % 25 == 0 and processed > 0:
+                logger.info(f"Progress: {processed} docs, {total_chunks} chunks indexed")
+                manifest.save()  # Periodic save
 
         except Exception as e:
             logger.error(f"FAILED: {file_name} — {e}")
+            manifest.mark_failed(rel_path, str(e))
             failed_docs += 1
+
+    # Save manifest
+    manifest.save()
 
     elapsed = round(time.time() - start, 1)
     logger.info("=" * 60)
     logger.info(f"INGESTION COMPLETE — {elapsed}s")
-    logger.info(f"  Documents: {total_docs} scanned, {skipped_docs} skipped, {failed_docs} failed")
-    logger.info(f"  Chunks: {total_chunks} indexed")
+    logger.info(f"  New: {added_docs}, Updated: {updated_docs}, Removed: {removed_docs}")
+    logger.info(f"  Unchanged: {len(diff['unchanged'])}, Failed: {failed_docs}")
+    logger.info(f"  Chunks indexed: {total_chunks}")
     logger.info(f"  DB mode: {db.mode}")
     logger.info("=" * 60)
 

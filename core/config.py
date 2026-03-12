@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # --- Data ---
     DATA_DIR: str = "Data/Rag"
+    MANIFEST_FILE: str = "Data/file_manifest.json"
 
     class Config:
         env_file = ".env"
