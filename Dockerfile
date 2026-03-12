@@ -8,8 +8,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Python dependencies (cached layer)
+# Install CPU-only PyTorch first (~200MB instead of ~915MB GPU version)
+# This prevents sentence-transformers from pulling the full CUDA build
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Pre-download ML models during build so startup is fast
 RUN python -c "\
