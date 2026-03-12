@@ -42,18 +42,35 @@ def run_ingestion():
     db = HybridSearchClient()
     logger.info(f"Database mode: {db.mode}")
 
-    # Check if data already exists
-    existing = db.get_total_count()
-    if existing > 0:
-        logger.info(f"Database already contains {existing} chunks. Skipping ingestion.")
-        return db
+    # Get already-indexed file hashes to skip duplicates
+    existing_count = db.get_total_count()
+    logger.info(f"Database contains {existing_count} existing chunks.")
+
+    existing_hashes = set()
+    if existing_count > 0:
+        try:
+            all_docs = db.get_all_payloads()
+            for doc in all_docs:
+                h = doc.get("document_id")
+                if h:
+                    existing_hashes.add(h)
+        except Exception:
+            pass
+    logger.info(f"Found {len(existing_hashes)} unique file hashes already indexed.")
 
     # Run pipeline
     total_docs = 0
     total_chunks = 0
     failed_docs = 0
+    skipped_docs = 0
 
     for payload in connector.scan_repository():
+        # Skip files already indexed (by SHA-256 hash)
+        file_hash = payload.get("document_id")
+        if file_hash and file_hash in existing_hashes:
+            skipped_docs += 1
+            continue
+
         total_docs += 1
         file_name = payload["file_name"]
 
@@ -87,7 +104,7 @@ def run_ingestion():
     elapsed = round(time.time() - start, 1)
     logger.info("=" * 60)
     logger.info(f"INGESTION COMPLETE — {elapsed}s")
-    logger.info(f"  Documents: {total_docs} scanned, {failed_docs} failed")
+    logger.info(f"  Documents: {total_docs} scanned, {skipped_docs} skipped, {failed_docs} failed")
     logger.info(f"  Chunks: {total_chunks} indexed")
     logger.info(f"  DB mode: {db.mode}")
     logger.info("=" * 60)
